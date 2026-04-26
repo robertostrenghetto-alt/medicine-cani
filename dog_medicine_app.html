@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐾 Dog Medicine Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,700;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #F7F3EE; --surface: #FFFFFF; --sidebar: #1C1410;
+    --accent: #C97B3F; --accent2: #7A9E5F; --danger: #C0392B; --warn: #E67E22;
+    --text: #1C1410; --muted: #8A7060; --border: #E5DDD5; --light: #EDE5DB;
+    --font-display: 'Fraunces', serif; --font-body: 'DM Sans', sans-serif;
+    --radius: 12px; --shadow: 0 2px 16px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+  .sidebar { width: 220px; min-width: 220px; background: var(--sidebar); display: flex; flex-direction: column; padding: 28px 0; z-index: 10; }
+  .sidebar-logo { padding: 0 24px 24px; border-bottom: 1px solid #2e2018; }
+  .sidebar-logo .paw { font-size: 32px; display: block; margin-bottom: 6px; }
+  .sidebar-logo h1 { font-family: var(--font-display); font-size: 16px; color: #fff; font-weight: 600; line-height: 1.3; }
+  .sidebar-logo p { font-size: 11px; color: #8A7060; margin-top: 2px; }
+  .nav { padding: 16px 0; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 24px; color: #C4B5A5; font-size: 13.5px; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; user-select: none; }
+  .nav-item:hover { background: #2a1e14; color: #fff; }
+  .nav-item.active { background: #2a1e14; color: #fff; border-left-color: var(--accent); }
+  .nav-item .icon { font-size: 17px; width: 22px; text-align: center; }
+  .nav-badge { margin-left: auto; background: var(--danger); color: #fff; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 1px 7px; min-width: 20px; text-align: center; }
+  .sidebar-bottom { padding: 14px 12px; border-top: 1px solid #2e2018; display: flex; flex-direction: column; gap: 8px; }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; min-height: 64px; }
+  .topbar h2 { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+  .topbar p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .content { flex: 1; overflow-y: auto; padding: 28px 32px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: none; font-family: var(--font-body); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.18s; white-space: nowrap; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #b56d34; }
+  .btn-success { background: var(--accent2); color: #fff; }
+  .btn-success:hover { background: #6a8e52; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #a93226; }
+  .btn-ghost { background: var(--light); color: var(--text); }
+  .btn-ghost:hover { background: var(--border); }
+  .btn-dark { background: #2a1e14; color: #C4B5A5; width: 100%; justify-content: center; font-size: 12px; }
+  .btn-dark:hover { background: #3a2a1c; color: #fff; }
+  .btn-sm { padding: 5px 11px; font-size: 12px; }
+
+  .card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
+  .card-header { padding: 14px 20px; background: var(--accent); display: flex; align-items: center; gap: 14px; }
+  .card-header h3 { color: #fff; font-size: 15px; font-weight: 600; font-family: var(--font-display); flex: 1; }
+  .card-header span { color: rgba(255,255,255,0.8); font-size: 12px; }
+  .card-body { padding: 16px 20px; }
+  .card-dog-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.5); flex-shrink: 0; }
+  .card-dog-avatar-placeholder { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .select-styled { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); font-family: var(--font-body); font-size: 13px; background: var(--surface); color: var(--text); cursor: pointer; outline: none; }
+
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--light); padding: 10px 14px; text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  td { padding: 10px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: #faf7f4; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: #e8f5e0; color: #4a7c2f; }
+  .badge-red { background: #fdecea; color: var(--danger); }
+  .badge-orange { background: #fef3e2; color: var(--warn); }
+  .badge-blue { background: #e3f0ff; color: #2563eb; }
+
+  .dog-thumb { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); }
+  .dog-thumb-ph { width: 36px; height: 36px; border-radius: 50%; background: var(--light); display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .stat-card .num { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--accent); }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+  .oggi-grid { display: grid; gap: 12px; }
+  .oggi-item { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 14px 18px; display: flex; align-items: center; gap: 14px; transition: box-shadow 0.2s; }
+  .oggi-item:hover { box-shadow: var(--shadow); }
+  .oggi-item.done { opacity: 0.55; }
+  .oggi-item.done .oggi-info h4 { text-decoration: line-through; }
+  .oggi-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .oggi-dot.done { background: var(--accent2); }
+  .oggi-info { flex: 1; }
+  .oggi-info h4 { font-size: 14px; font-weight: 600; }
+  .oggi-info p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .oggi-scorte { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 16px; padding: 28px; width: 90%; max-width: 500px; box-shadow: 0 8px 40px rgba(0,0,0,0.18); max-height: 90vh; overflow-y: auto; }
+  .modal h3 { font-family: var(--font-display); font-size: 18px; margin-bottom: 20px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); font-family: var(--font-body); font-size: 13px; background: var(--bg); color: var(--text); outline: none; transition: border 0.2s; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { resize: vertical; min-height: 72px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* FOTO */
+  .foto-area { display: flex; align-items: center; gap: 16px; padding: 12px; background: var(--bg); border-radius: 10px; border: 1px solid var(--border); }
+  .foto-circle { width: 72px; height: 72px; border-radius: 50%; background: var(--light); display: flex; align-items: center; justify-content: center; font-size: 30px; overflow: hidden; flex-shrink: 0; border: 2px solid var(--border); }
+  .foto-circle img { width: 100%; height: 100%; object-fit: cover; }
+  .foto-btn-wrap { position: relative; overflow: hidden; display: inline-block; }
+  .foto-btn-wrap input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+
+  .notif-banner { background: #fff8f0; border: 1px solid #f5cfa0; border-radius: var(--radius); padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1C1410; color: #fff; padding: 12px 22px; border-radius: 10px; font-size: 13px; z-index: 999; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .loader { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+  .empty .ei { font-size: 48px; display: block; margin-bottom: 12px; }
+
+  @media (max-width: 680px) {
+    .sidebar { width: 60px; min-width: 60px; }
+    .sidebar-logo, .nav-item span, .btn-dark span { display: none; }
+    .nav-item { justify-content: center; padding: 13px; }
+    .sidebar-bottom { padding: 8px 6px; }
+    .content { padding: 16px 12px; }
+    .topbar { padding: 12px 16px; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <span class="paw">🐾</span>
+    <h1>Dog Medicine Manager</h1>
+    <p>by Roberto</p>
+  </div>
+  <div class="nav">
+    <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">🏠</span><span>Dashboard</span></div>
+    <div class="nav-item" onclick="showPage('oggi')"><span class="icon">⏰</span><span>Oggi</span><span class="nav-badge" id="badge-oggi" style="display:none">0</span></div>
+    <div class="nav-item" onclick="showPage('cani')"><span class="icon">🐶</span><span>Cani</span></div>
+    <div class="nav-item" onclick="showPage('medicine')"><span class="icon">💊</span><span>Medicine</span></div>
+    <div class="nav-item" onclick="showPage('storico')"><span class="icon">📋</span><span>Storico</span></div>
+    <div class="nav-item" onclick="showPage('vaccinazioni')"><span class="icon">💉</span><span>Vaccinazioni</span><span class="nav-badge" id="badge-vaccini" style="display:none">0</span></div>
+  </div>
+  <div class="sidebar-bottom">
+    <button class="btn btn-dark" onclick="esportaBackup()">💾 <span>Esporta backup</span></button>
+    <button class="btn btn-dark" onclick="document.getElementById('import-file').click()">📂 <span>Importa backup</span></button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importaBackup(event)">
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div><h2 id="page-title">Dashboard</h2><p id="page-sub">Benvenuto nel tuo gestore medicine</p></div>
+  </div>
+  <div class="content">
+
+    <div class="page active" id="page-dashboard">
+      <div class="stats-row" id="stats-row"></div>
+      <div id="dashboard-cani"></div>
+    </div>
+
+    <div class="page" id="page-oggi">
+      <div id="notif-permission-banner"></div>
+      <div id="oggi-list" class="oggi-grid"></div>
+    </div>
+
+    <div class="page" id="page-cani">
+      <div class="toolbar"><button class="btn btn-primary" onclick="openModalCane()">+ Aggiungi cane</button></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Foto</th><th>Nome</th><th>Data nascita</th><th>Microchip</th><th>Veterinario</th><th>Patologie</th><th>Azioni</th></tr></thead>
+        <tbody id="table-cani"></tbody></table>
+      </div>
+    </div>
+
+    <div class="page" id="page-medicine">
+      <div class="toolbar">
+        <select class="select-styled" id="filter-cane-med" onchange="loadMedicine()"></select>
+        <button class="btn btn-primary" onclick="openModalMedicina()">+ Aggiungi medicina</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Medicina</th><th>Dosaggio</th><th>Frequenza</th><th>Orari</th><th>Inizio</th><th>Fine</th><th>Scorte</th><th>Stato</th><th>Azioni</th></tr></thead>
+        <tbody id="table-medicine"></tbody></table>
+      </div>
+    </div>
+
+    <div class="page" id="page-storico">
+      <div class="toolbar"><select class="select-styled" id="filter-cane-storico" onchange="loadStorico()"></select></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Medicina</th><th>Data e ora</th><th>Dose</th><th>Note</th><th>Azioni</th></tr></thead>
+        <tbody id="table-storico"></tbody></table>
+      </div>
+    </div>
+
+    <div class="page" id="page-vaccinazioni">
+      <div class="toolbar">
+        <select class="select-styled" id="filter-cane-vac" onchange="loadVaccinazioni()"></select>
+        <button class="btn btn-primary" onclick="openModalVaccino()">+ Aggiungi vaccinazione</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Vaccino</th><th>Tipo</th><th>Ultima somm.</th><th>Prossimo richiamo</th><th>Veterinario</th><th>Note</th><th>Stato</th><th>Azioni</th></tr></thead>
+        <tbody id="table-vaccinazioni"></tbody></table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL CANE -->
+<div class="modal-overlay" id="modal-cane">
+  <div class="modal">
+    <h3 id="modal-cane-title">Aggiungi cane</h3>
+    <input type="hidden" id="cane-id">
+    <input type="hidden" id="cane-foto-url">
+    <div class="form-group">
+      <label>Foto del cane</label>
+      <div class="foto-area">
+        <div class="foto-circle" id="foto-circle"><span id="foto-placeholder-icon">🐶</span></div>
+        <div>
+          <div class="foto-btn-wrap">
+            <button class="btn btn-ghost btn-sm">📷 Scegli foto</button>
+            <input type="file" id="cane-foto-input" accept="image/*" onchange="previewFoto(event)">
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px">JPG o PNG, max 5MB</p>
+        </div>
+      </div>
+    </div>
+    <div class="form-group"><label>Nome *</label><input type="text" id="cane-nome" placeholder="es. Fido"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Data di nascita</label><input type="date" id="cane-nascita"></div>
+      <div class="form-group"><label>N° Microchip</label><input type="text" id="cane-microchip" placeholder="380..."></div>
+    </div>
+    <div class="form-group"><label>Veterinario</label><input type="text" id="cane-vet" placeholder="Dr. Rossi"></div>
+    <div class="form-group"><label>Patologie</label><textarea id="cane-patologie" placeholder="Descrivi eventuali patologie..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cane')">Annulla</button>
+      <button class="btn btn-primary" id="btn-salva-cane" onclick="salvaCane()">💾 Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MEDICINA -->
+<div class="modal-overlay" id="modal-medicina">
+  <div class="modal">
+    <h3 id="modal-med-title">Aggiungi medicina</h3>
+    <input type="hidden" id="med-id">
+    <div class="form-row">
+      <div class="form-group"><label>Cane *</label><select id="med-cane"></select></div>
+      <div class="form-group"><label>Nome medicina *</label><input type="text" id="med-nome" placeholder="es. Amoxicillina"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Dosaggio</label><input type="text" id="med-dosaggio" placeholder="es. 250mg"></div>
+      <div class="form-group"><label>Frequenza</label>
+        <select id="med-frequenza">
+          <option value="">— seleziona —</option>
+          <option>1 volta/giorno</option><option>2 volte/giorno</option><option>3 volte/giorno</option>
+          <option>ogni 12 ore</option><option>ogni 8 ore</option><option>settimanale</option><option>al bisogno</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Orari</label><input type="text" id="med-orari" placeholder="es. 08:00, 20:00"></div>
+      <div class="form-group"><label>Stato</label>
+        <select id="med-attiva"><option value="true">✅ In terapia</option><option value="false">⏸ Sospesa</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Data inizio</label><input type="date" id="med-inizio"></div>
+      <div class="form-group"><label>Data fine</label><input type="date" id="med-fine"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Scorte</label><input type="number" id="med-scorte" value="0" min="0"></div>
+      <div class="form-group"><label>Unità</label>
+        <select id="med-unita"><option>compresse</option><option>ml</option><option>fiale</option><option>bustine</option><option>capsule</option><option>gocce</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Note</label><textarea id="med-note" placeholder="Note aggiuntive..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-medicina')">Annulla</button>
+      <button class="btn btn-primary" onclick="salvaMedicina()">💾 Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SOMMINISTRAZIONE -->
+<div class="modal-overlay" id="modal-somm">
+  <div class="modal">
+    <h3>Registra somministrazione</h3>
+    <input type="hidden" id="somm-med-id">
+    <input type="hidden" id="somm-cane-id">
+    <div class="form-group"><label>Medicina</label><input type="text" id="somm-med-nome" readonly style="background:#eee"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Data</label><input type="date" id="somm-data"></div>
+      <div class="form-group"><label>Ora</label><input type="time" id="somm-ora"></div>
+    </div>
+    <div class="form-group"><label>Dose somministrata</label><input type="text" id="somm-dose" placeholder="es. 1 compressa"></div>
+    <div class="form-group"><label>Note</label><textarea id="somm-note" placeholder="Note..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-somm')">Annulla</button>
+      <button class="btn btn-success" onclick="salvaSomministrazione()">✅ Registra</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VACCINO -->
+<div class="modal-overlay" id="modal-vaccino">
+  <div class="modal">
+    <h3 id="modal-vac-title">Aggiungi vaccinazione</h3>
+    <input type="hidden" id="vac-id">
+    <div class="form-row">
+      <div class="form-group"><label>Cane *</label><select id="vac-cane"></select></div>
+      <div class="form-group"><label>Nome vaccino *</label><input type="text" id="vac-nome" placeholder="es. Rabbia, Leptospirosi..."></div>
+    </div>
+    <div class="form-group"><label>Tipo</label>
+      <select id="vac-tipo">
+        <option value="obbligatoria">⚠️ Obbligatoria</option>
+        <option value="facoltativa">✅ Facoltativa</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Data ultima somm.</label><input type="date" id="vac-ultima"></div>
+      <div class="form-group"><label>Data prossimo richiamo</label><input type="date" id="vac-richiamo"></div>
+    </div>
+    <div class="form-group"><label>Veterinario</label><input type="text" id="vac-vet" placeholder="Dr. Rossi"></div>
+    <div class="form-group"><label>Note</label><textarea id="vac-note" placeholder="Note..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-vaccino')">Annulla</button>
+      <button class="btn btn-primary" onclick="salvaVaccino()">💾 Salva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ovwauqqwwsoyilsshzta.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_8IOAUOAijkP0E3yIol1GrQ_jk-UpFAk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let caniCache = [];
+let currentPage = 'dashboard';
+let fotoFileSelezionato = null;
+
+// ── TOAST ─────────────────────────────────────
+function showToast(msg, ms = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ── NAVIGAZIONE ───────────────────────────────
+const pageTitles = {
+  dashboard:    ['Dashboard','Riepilogo generale'],
+  oggi:         ['⏰ Promemoria di oggi','Medicine da somministrare oggi'],
+  cani:         ['🐶 I miei cani','Anagrafica e informazioni'],
+  medicine:     ['💊 Medicine','Farmaci, dosaggi e scorte'],
+  storico:      ['📋 Storico somministrazioni','Registro completo'],
+  vaccinazioni: ['💉 Vaccinazioni','Vaccini obbligatori e facoltativi'],
+};
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item')[['dashboard','oggi','cani','medicine','storico','vaccinazioni'].indexOf(name)].classList.add('active');
+  const [t,s] = pageTitles[name];
+  document.getElementById('page-title').textContent = t;
+  document.getElementById('page-sub').textContent = s;
+  currentPage = name;
+  if (name==='dashboard')    loadDashboard();
+  if (name==='oggi')         loadOggi();
+  if (name==='cani')         loadCani();
+  if (name==='medicine')     { populateCaneFilter('filter-cane-med'); loadMedicine(); }
+  if (name==='storico')      { populateCaneFilter('filter-cane-storico'); loadStorico(); }
+  if (name==='vaccinazioni') { populateCaneFilter('filter-cane-vac'); loadVaccinazioni(); }
+}
+
+// ── UTILITY ───────────────────────────────────
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('it-IT') : '—'; }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function nowDT() { const n=new Date(); return [n.toISOString().split('T')[0], n.toTimeString().slice(0,5)]; }
+function thumbHtml(url, size=36) {
+  return url
+    ? `<img src="${url}" class="dog-thumb" style="width:${size}px;height:${size}px" onerror="this.outerHTML='<div class=dog-thumb-ph style=width:${size}px;height:${size}px>🐶</div>'">`
+    : `<div class="dog-thumb-ph" style="width:${size}px;height:${size}px;font-size:${size*.5}px">🐶</div>`;
+}
+
+// ── FOTO ──────────────────────────────────────
+function previewFoto(e) {
+  const file = e.target.files[0]; if (!file) return;
+  fotoFileSelezionato = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const circ = document.getElementById('foto-circle');
+    circ.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadFoto(caneId) {
+  if (!fotoFileSelezionato) return null;
+  const ext = fotoFileSelezionato.name.split('.').pop().toLowerCase();
+  const path = `${caneId}.${ext}`;
+  const { error } = await sb.storage.from('foto-cani').upload(path, fotoFileSelezionato, { upsert: true });
+  if (error) { console.error(error); showToast('⚠️ Errore caricamento foto'); return null; }
+  const { data } = sb.storage.from('foto-cani').getPublicUrl(path);
+  return data.publicUrl + '?v=' + Date.now();
+}
+
+// ── CANI ──────────────────────────────────────
+async function loadCani() {
+  const tbody = document.getElementById('table-cani');
+  tbody.innerHTML = '<tr><td colspan="7" class="loader">Caricamento...</td></tr>';
+  const { data } = await sb.from('cani').select('*').order('nome');
+  caniCache = data || [];
+  if (!caniCache.length) { tbody.innerHTML='<tr><td colspan="7"><div class="empty"><span class="ei">🐶</span><p>Nessun cane. Aggiungine uno!</p></div></td></tr>'; return; }
+  tbody.innerHTML = caniCache.map(c => `<tr>
+    <td>${thumbHtml(c.foto_url,36)}</td>
+    <td><strong>${c.nome}</strong></td>
+    <td>${fmtDate(c.data_nascita)}</td>
+    <td>${c.microchip||'—'}</td><td>${c.veterinario||'—'}</td><td>${c.patologie||'—'}</td>
+    <td>
+      <button class="btn btn-ghost btn-sm" onclick="editCane('${c.id}')">✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCane('${c.id}','${c.nome}')">🗑</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function populateCaneFilter(selId) {
+  const { data } = await sb.from('cani').select('id,nome').order('nome');
+  caniCache = data || [];
+  const sel = document.getElementById(selId); if (!sel) return;
+  sel.innerHTML = caniCache.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+}
+
+function resetFotoUI() {
+  fotoFileSelezionato = null;
+  document.getElementById('foto-circle').innerHTML = '<span id="foto-placeholder-icon">🐶</span>';
+  document.getElementById('cane-foto-input').value = '';
+  document.getElementById('cane-foto-url').value = '';
+}
+
+function openModalCane() {
+  document.getElementById('cane-id').value='';
+  ['cane-nome','cane-nascita','cane-microchip','cane-vet','cane-patologie'].forEach(id=>document.getElementById(id).value='');
+  resetFotoUI();
+  document.getElementById('modal-cane-title').textContent='Aggiungi cane';
+  document.getElementById('modal-cane').classList.add('open');
+}
+
+async function editCane(id) {
+  const c = caniCache.find(x=>x.id===id); if (!c) return;
+  document.getElementById('cane-id').value=c.id;
+  document.getElementById('cane-nome').value=c.nome;
+  document.getElementById('cane-nascita').value=c.data_nascita||'';
+  document.getElementById('cane-microchip').value=c.microchip||'';
+  document.getElementById('cane-vet').value=c.veterinario||'';
+  document.getElementById('cane-patologie').value=c.patologie||'';
+  resetFotoUI();
+  if (c.foto_url) {
+    document.getElementById('foto-circle').innerHTML=`<img src="${c.foto_url}" style="width:100%;height:100%;object-fit:cover">`;
+    document.getElementById('cane-foto-url').value=c.foto_url;
+  }
+  document.getElementById('modal-cane-title').textContent='Modifica cane';
+  document.getElementById('modal-cane').classList.add('open');
+}
+
+async function salvaCane() {
+  const nome = document.getElementById('cane-nome').value.trim();
+  if (!nome) { alert('Inserisci il nome del cane.'); return; }
+  const btn = document.getElementById('btn-salva-cane');
+  btn.disabled=true; btn.textContent='⏳ Salvataggio...';
+
+  let id = document.getElementById('cane-id').value;
+  let fotoUrl = document.getElementById('cane-foto-url').value || null;
+
+  // Se nuova foto, serve un id — creiamo il record prima se necessario
+  if (fotoFileSelezionato && !id) {
+    const { data: ins } = await sb.from('cani').insert({ nome }).select().single();
+    id = ins?.id;
+  }
+  if (fotoFileSelezionato && id) fotoUrl = await uploadFoto(id);
+
+  const payload = {
+    nome,
+    data_nascita: document.getElementById('cane-nascita').value||null,
+    microchip:    document.getElementById('cane-microchip').value.trim()||null,
+    veterinario:  document.getElementById('cane-vet').value.trim()||null,
+    patologie:    document.getElementById('cane-patologie').value.trim()||null,
+    foto_url:     fotoUrl,
+  };
+
+  if (id) await sb.from('cani').update(payload).eq('id', id);
+  else    await sb.from('cani').insert(payload);
+
+  btn.disabled=false; btn.textContent='💾 Salva';
+  closeModal('modal-cane');
+  loadCani(); updateBadgeOggi();
+  showToast('✅ Cane salvato!');
+}
+
+async function deleteCane(id, nome) {
+  if (!confirm(`Eliminare ${nome} e tutte le sue medicine?`)) return;
+  await sb.storage.from('foto-cani').remove([`${id}.jpg`,`${id}.jpeg`,`${id}.png`,`${id}.webp`]);
+  await sb.from('cani').delete().eq('id', id);
+  loadCani(); showToast('🗑 Cane eliminato');
+}
+
+// ── MEDICINE ──────────────────────────────────
+async function loadMedicine() {
+  const tbody = document.getElementById('table-medicine');
+  const cid = document.getElementById('filter-cane-med')?.value;
+  if (!cid) return;
+  tbody.innerHTML='<tr><td colspan="9" class="loader">Caricamento...</td></tr>';
+  const { data } = await sb.from('medicine').select('*').eq('cane_id',cid).order('nome');
+  if (!data?.length) { tbody.innerHTML='<tr><td colspan="9"><div class="empty"><span class="ei">💊</span><p>Nessuna medicina.</p></div></td></tr>'; return; }
+  tbody.innerHTML = data.map(m => {
+    const sc=parseInt(m.scorte);
+    const scC=sc<=3?'badge badge-red':sc<=10?'badge badge-orange':'badge badge-green';
+    return `<tr>
+      <td><strong>${m.nome}</strong></td><td>${m.dosaggio||'—'}</td><td>${m.frequenza||'—'}</td><td>${m.orari||'—'}</td>
+      <td>${fmtDate(m.data_inizio)}</td><td>${fmtDate(m.data_fine)}</td>
+      <td><span class="${scC}">${sc} ${m.unita_scorte}</span></td>
+      <td>${m.attiva?'<span class="badge badge-green">✅ Attiva</span>':'<span class="badge badge-blue">⏸ Sospesa</span>'}</td>
+      <td>
+        <button class="btn btn-success btn-sm" onclick="openModalSomm('${m.id}','${m.cane_id}','${m.nome}')">✅</button>
+        <button class="btn btn-ghost btn-sm" onclick="editMedicina('${m.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMedicina('${m.id}','${m.nome}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function populateModalCaniSelect() {
+  const { data } = await sb.from('cani').select('id,nome').order('nome');
+  document.getElementById('med-cane').innerHTML=(data||[]).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+}
+
+async function openModalMedicina() {
+  await populateModalCaniSelect();
+  document.getElementById('med-id').value='';
+  ['med-nome','med-dosaggio','med-orari','med-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('med-frequenza').value='';
+  document.getElementById('med-attiva').value='true';
+  document.getElementById('med-inizio').value='';
+  document.getElementById('med-fine').value='';
+  document.getElementById('med-scorte').value='0';
+  document.getElementById('med-unita').value='compresse';
+  const cid=document.getElementById('filter-cane-med')?.value;
+  if(cid) document.getElementById('med-cane').value=cid;
+  document.getElementById('modal-med-title').textContent='Aggiungi medicina';
+  document.getElementById('modal-medicina').classList.add('open');
+}
+
+async function editMedicina(id) {
+  const { data: m } = await sb.from('medicine').select('*').eq('id',id).single(); if(!m) return;
+  await populateModalCaniSelect();
+  document.getElementById('med-id').value=m.id;
+  document.getElementById('med-cane').value=m.cane_id;
+  document.getElementById('med-nome').value=m.nome;
+  document.getElementById('med-dosaggio').value=m.dosaggio||'';
+  document.getElementById('med-frequenza').value=m.frequenza||'';
+  document.getElementById('med-orari').value=m.orari||'';
+  document.getElementById('med-attiva').value=String(m.attiva);
+  document.getElementById('med-inizio').value=m.data_inizio||'';
+  document.getElementById('med-fine').value=m.data_fine||'';
+  document.getElementById('med-scorte').value=m.scorte||0;
+  document.getElementById('med-unita').value=m.unita_scorte||'compresse';
+  document.getElementById('med-note').value=m.note||'';
+  document.getElementById('modal-med-title').textContent='Modifica medicina';
+  document.getElementById('modal-medicina').classList.add('open');
+}
+
+async function salvaMedicina() {
+  const nome=document.getElementById('med-nome').value.trim();
+  if(!nome){alert('Inserisci il nome della medicina.');return;}
+  const id=document.getElementById('med-id').value;
+  const payload={
+    cane_id:document.getElementById('med-cane').value,
+    nome, dosaggio:document.getElementById('med-dosaggio').value.trim()||null,
+    frequenza:document.getElementById('med-frequenza').value||null,
+    orari:document.getElementById('med-orari').value.trim()||null,
+    attiva:document.getElementById('med-attiva').value==='true',
+    data_inizio:document.getElementById('med-inizio').value||null,
+    data_fine:document.getElementById('med-fine').value||null,
+    scorte:parseInt(document.getElementById('med-scorte').value)||0,
+    unita_scorte:document.getElementById('med-unita').value,
+    note:document.getElementById('med-note').value.trim()||null,
+  };
+  if(id) await sb.from('medicine').update(payload).eq('id',id);
+  else   await sb.from('medicine').insert(payload);
+  closeModal('modal-medicina'); loadMedicine(); updateBadgeOggi();
+  showToast('✅ Medicina salvata!');
+}
+
+async function deleteMedicina(id,nome) {
+  if(!confirm(`Eliminare '${nome}'?`)) return;
+  await sb.from('medicine').delete().eq('id',id);
+  loadMedicine(); updateBadgeOggi(); showToast('🗑 Medicina eliminata');
+}
+
+// ── SOMMINISTRAZIONE ──────────────────────────
+function openModalSomm(medId,caneId,medNome) {
+  const [d,t]=nowDT();
+  document.getElementById('somm-med-id').value=medId;
+  document.getElementById('somm-cane-id').value=caneId;
+  document.getElementById('somm-med-nome').value=medNome;
+  document.getElementById('somm-data').value=d;
+  document.getElementById('somm-ora').value=t;
+  document.getElementById('somm-dose').value='';
+  document.getElementById('somm-note').value='';
+  document.getElementById('modal-somm').classList.add('open');
+}
+
+async function salvaSomministrazione() {
+  const medId=document.getElementById('somm-med-id').value;
+  const caneId=document.getElementById('somm-cane-id').value;
+  const d=document.getElementById('somm-data').value;
+  const t=document.getElementById('somm-ora').value;
+  if(!d||!t){alert('Inserisci data e ora.');return;}
+  await sb.from('somministrazioni').insert({
+    medicina_id:medId, cane_id:caneId, data_ora:`${d}T${t}:00`,
+    dose_data:document.getElementById('somm-dose').value.trim()||null,
+    note:document.getElementById('somm-note').value.trim()||null,
+  });
+  const { data:med }=await sb.from('medicine').select('scorte').eq('id',medId).single();
+  if(med&&med.scorte>0) await sb.from('medicine').update({scorte:med.scorte-1}).eq('id',medId);
+  closeModal('modal-somm');
+  showToast('✅ Somministrazione registrata!');
+  if(currentPage==='storico')  loadStorico();
+  if(currentPage==='medicine') loadMedicine();
+  if(currentPage==='oggi')     loadOggi();
+  if(currentPage==='dashboard') loadDashboard();
+  updateBadgeOggi();
+}
+
+// ── STORICO ───────────────────────────────────
+async function loadStorico() {
+  const tbody=document.getElementById('table-storico');
+  const cid=document.getElementById('filter-cane-storico')?.value; if(!cid) return;
+  tbody.innerHTML='<tr><td colspan="5" class="loader">Caricamento...</td></tr>';
+  const { data }=await sb.from('somministrazioni').select('*, medicine(nome)').eq('cane_id',cid).order('data_ora',{ascending:false});
+  if(!data?.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty"><span class="ei">📋</span><p>Nessuna somministrazione.</p></div></td></tr>';return;}
+  tbody.innerHTML=data.map(s=>`<tr>
+    <td><strong>${s.medicine?.nome||'—'}</strong></td>
+    <td>${new Date(s.data_ora).toLocaleString('it-IT')}</td>
+    <td>${s.dose_data||'—'}</td><td>${s.note||'—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteSomm('${s.id}')">🗑</button></td>
+  </tr>`).join('');
+}
+
+async function deleteSomm(id) {
+  if(!confirm('Eliminare questa registrazione?')) return;
+  await sb.from('somministrazioni').delete().eq('id',id);
+  loadStorico(); showToast('🗑 Registrazione eliminata');
+}
+
+// ── OGGI ──────────────────────────────────────
+async function loadOggi() {
+  const container=document.getElementById('oggi-list');
+  container.innerHTML='<div class="loader">Caricamento...</div>';
+  const banner=document.getElementById('notif-permission-banner');
+  if('Notification' in window && Notification.permission==='default') {
+    banner.innerHTML=`<div class="notif-banner"><span>🔔</span><span>Vuoi ricevere notifiche?</span><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="richiediNotifiche()">Attiva</button></div>`;
+  } else banner.innerHTML='';
+
+  const { data:medicine }=await sb.from('medicine').select('*, cani(nome)').eq('attiva',true).order('nome');
+  if(!medicine?.length){container.innerHTML='<div class="empty"><span class="ei">✅</span><p>Nessuna medicina attiva.</p></div>';updateBadgeOggi(0);return;}
+
+  const oggi=todayStr();
+  const { data:sommOggi }=await sb.from('somministrazioni').select('medicina_id').gte('data_ora',oggi+'T00:00:00').lte('data_ora',oggi+'T23:59:59');
+  const fatte=new Set((sommOggi||[]).map(s=>s.medicina_id));
+
+  let pendenti=0;
+  container.innerHTML=medicine.map(m=>{
+    const done=fatte.has(m.id); if(!done) pendenti++;
+    const sc=parseInt(m.scorte);
+    const scHtml=sc<=3
+      ?`<span class="oggi-scorte" style="background:#fdecea;color:#c0392b">⚠️ ${sc} ${m.unita_scorte}</span>`
+      :`<span class="oggi-scorte" style="background:#e8f5e0;color:#4a7c2f">${sc} ${m.unita_scorte}</span>`;
+    return `<div class="oggi-item ${done?'done':''}">
+      <div class="oggi-dot ${done?'done':''}"></div>
+      <div class="oggi-info">
+        <h4>💊 ${m.nome} — <em>${m.cani?.nome||''}</em></h4>
+        <p>${m.frequenza||''} ${m.orari?'· '+m.orari:''} ${m.dosaggio?'· '+m.dosaggio:''}</p>
+      </div>
+      ${scHtml}
+      ${done
+        ?'<span class="badge badge-green" style="margin-left:10px">✅ Fatto</span>'
+        :`<button class="btn btn-success btn-sm" style="margin-left:10px" onclick="openModalSomm('${m.id}','${m.cane_id}','${m.nome}')">✅ Somministra</button>`
+      }
+    </div>`;
+  }).join('');
+  updateBadgeOggi(pendenti);
+}
+
+async function updateBadgeOggi(n) {
+  if(n===undefined){
+    const { data:med }=await sb.from('medicine').select('id').eq('attiva',true);
+    const oggi=todayStr();
+    const { data:s }=await sb.from('somministrazioni').select('medicina_id').gte('data_ora',oggi+'T00:00:00').lte('data_ora',oggi+'T23:59:59');
+    const fatte=new Set((s||[]).map(x=>x.medicina_id));
+    n=(med||[]).filter(m=>!fatte.has(m.id)).length;
+  }
+  const badge=document.getElementById('badge-oggi');
+  if(n>0){badge.style.display='';badge.textContent=n;}else badge.style.display='none';
+}
+
+function richiediNotifiche() {
+  Notification.requestPermission().then(p=>{
+    if(p==='granted'){new Notification('🐾 Dog Medicine Manager',{body:'Notifiche attivate!'});document.getElementById('notif-permission-banner').innerHTML='';}
+  });
+}
+
+async function checkNotificheAlAvvio() {
+  if(!('Notification' in window)||Notification.permission!=='granted') return;
+  const { data:med }=await sb.from('medicine').select('id,nome').eq('attiva',true);
+  if(!med?.length) return;
+  const oggi=todayStr();
+  const { data:s }=await sb.from('somministrazioni').select('medicina_id').gte('data_ora',oggi+'T00:00:00').lte('data_ora',oggi+'T23:59:59');
+  const fatte=new Set((s||[]).map(x=>x.medicina_id));
+  const pendenti=med.filter(m=>!fatte.has(m.id));
+  if(pendenti.length) new Notification('🐾 Medicine da somministrare oggi',{body:pendenti.map(m=>'💊 '+m.nome).join('\n')});
+}
+
+// ── DASHBOARD ─────────────────────────────────
+async function loadDashboard() {
+  const { data:cani }=await sb.from('cani').select('*').order('nome');
+  const { data:medicine }=await sb.from('medicine').select('*').eq('attiva',true);
+  const oggi=todayStr();
+  const { data:sommOggi }=await sb.from('somministrazioni').select('medicina_id').gte('data_ora',oggi+'T00:00:00').lte('data_ora',oggi+'T23:59:59');
+  const fatte=new Set((sommOggi||[]).map(s=>s.medicina_id));
+  const pendenti=(medicine||[]).filter(m=>!fatte.has(m.id)).length;
+  const scorteBasse=(medicine||[]).filter(m=>m.scorte<=3).length;
+
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat-card"><div class="num">${(cani||[]).length}</div><div class="lbl">🐶 Cani registrati</div></div>
+    <div class="stat-card"><div class="num">${(medicine||[]).length}</div><div class="lbl">💊 Terapie attive</div></div>
+    <div class="stat-card"><div class="num" style="color:${pendenti>0?'var(--warn)':'var(--accent2)'}">${pendenti}</div><div class="lbl">⏰ Da somministrare oggi</div></div>
+    <div class="stat-card"><div class="num" style="color:${scorteBasse>0?'var(--danger)':'var(--accent2)'}">${scorteBasse}</div><div class="lbl">⚠️ Scorte in esaurimento</div></div>`;
+
+  const container=document.getElementById('dashboard-cani');
+  if(!cani?.length){container.innerHTML='<div class="empty"><span class="ei">🐶</span><p>Nessun cane. Vai su <strong>Cani</strong> per iniziare!</p></div>';return;}
+
+  const { data:allMed }=await sb.from('medicine').select('*').order('nome');
+  container.innerHTML=(await Promise.all(cani.map(async c=>{
+    const meds=(allMed||[]).filter(m=>m.cane_id===c.id);
+    const { data:lastSomm }=await sb.from('somministrazioni').select('data_ora, medicine(nome)').eq('cane_id',c.id).order('data_ora',{ascending:false}).limit(1);
+    const last=lastSomm?.[0];
+    const medsHtml=meds.length?meds.map(m=>{
+      const sc=parseInt(m.scorte);
+      const col=sc<=3?'var(--danger)':'var(--accent2)';
+      const stato=m.attiva?'':' <span class="badge badge-blue">sospesa</span>';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span>💊 <strong>${m.nome}</strong>${stato} — ${m.dosaggio||''} ${m.frequenza?'· '+m.frequenza:''}</span>
+        <span style="font-size:12px;font-weight:700;color:${col}">${sc} ${m.unita_scorte}</span>
+      </div>`;
+    }).join(''):'<p style="color:var(--muted);font-size:13px;padding:4px 0">Nessuna medicina registrata.</p>';
+
+    // vaccinazioni in scadenza
+    const oggi2=new Date(); oggi2.setHours(0,0,0,0);
+    const { data:vacs }=await sb.from('vaccinazioni').select('nome,data_richiamo,tipo').eq('cane_id',c.id).order('data_richiamo',{ascending:true});
+    const vacsHtml=(vacs||[]).length?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <p style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Vaccinazioni</p>
+      ${(vacs||[]).map(v=>{
+        let stato='<span class="badge badge-green" style="font-size:10px">✅</span>';
+        if(v.data_richiamo){
+          const diff=Math.ceil((new Date(v.data_richiamo)-oggi2)/(1000*60*60*24));
+          if(diff<0) stato='<span class="badge badge-red" style="font-size:10px">❌ Scaduto</span>';
+          else if(diff<=30) stato=`<span class="badge badge-orange" style="font-size:10px">⚠️ ${diff}gg</span>`;
+        }
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+          <span style="font-size:12px">💉 <strong>${v.nome}</strong></span>
+          <span>${stato} ${v.data_richiamo?'<span style="font-size:11px;color:var(--muted)">richiamo: '+fmtDate(v.data_richiamo)+'</span>':''}</span>
+        </div>`;
+      }).join('')}
+    </div>`:'';
+
+
+    const avatarHtml=c.foto_url
+      ?`<img src="${c.foto_url}" class="card-dog-avatar" onerror="this.outerHTML='<div class=card-dog-avatar-placeholder>🐶</div>'">`
+      :'<div class="card-dog-avatar-placeholder">🐶</div>';
+
+    return `<div class="card">
+      <div class="card-header">
+        ${avatarHtml}
+        <h3>${c.nome}</h3>
+        <span>${c.veterinario?'Vet: '+c.veterinario:''}</span>
+      </div>
+      <div class="card-body">
+        ${medsHtml}
+        ${vacsHtml}
+        ${last?`<p style="margin-top:10px;font-size:12px;color:var(--muted)">Ultima: <strong>${last.medicine?.nome}</strong> — ${new Date(last.data_ora).toLocaleString('it-IT')}</p>`:''}
+      </div>
+    </div>`;
+  }))).join('');
+}
+
+// ── BACKUP ────────────────────────────────────
+async function esportaBackup() {
+  showToast('⏳ Preparazione backup...');
+  const { data:cani }=await sb.from('cani').select('*');
+  const { data:medicine }=await sb.from('medicine').select('*');
+  const { data:somministrazioni }=await sb.from('somministrazioni').select('*');
+  const { data:vaccinazioni }=await sb.from('vaccinazioni').select('*');
+  const backup={ versione:'1.1', data_backup:new Date().toISOString(), cani:cani||[], medicine:medicine||[], somministrazioni:somministrazioni||[], vaccinazioni:vaccinazioni||[] };
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`dog-medicine-backup-${todayStr()}.json`;
+  a.click();
+  showToast('✅ Backup scaricato!');
+}
+
+async function importaBackup(e) {
+  const file=e.target.files[0]; if(!file) return;
+  if(!confirm('⚠️ I dati del backup verranno aggiunti a quelli esistenti. Continuare?')) return;
+  showToast('⏳ Importazione in corso...');
+  try {
+    const backup=JSON.parse(await file.text());
+    if(!backup.cani||!backup.medicine) throw new Error('File non valido');
+    for(const c of backup.cani) await sb.from('cani').upsert(c,{onConflict:'id',ignoreDuplicates:true});
+    for(const m of backup.medicine) await sb.from('medicine').upsert(m,{onConflict:'id',ignoreDuplicates:true});
+    for(const s of (backup.somministrazioni||[])) await sb.from('somministrazioni').upsert(s,{onConflict:'id',ignoreDuplicates:true});
+    for(const v of (backup.vaccinazioni||[])) await sb.from('vaccinazioni').upsert(v,{onConflict:'id',ignoreDuplicates:true});
+    showToast('✅ Backup importato!');
+    loadDashboard(); updateBadgeOggi();
+  } catch(err) { showToast('❌ File non valido'); console.error(err); }
+  e.target.value='';
+}
+
+// ── VACCINAZIONI ──────────────────────────────
+async function loadVaccinazioni() {
+  const tbody=document.getElementById('table-vaccinazioni');
+  const cid=document.getElementById('filter-cane-vac')?.value; if(!cid) return;
+  tbody.innerHTML='<tr><td colspan="8" class="loader">Caricamento...</td></tr>';
+  const { data }=await sb.from('vaccinazioni').select('*').eq('cane_id',cid).order('data_richiamo',{ascending:true});
+  if(!data?.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty"><span class="ei">💉</span><p>Nessuna vaccinazione registrata.</p></div></td></tr>';return;}
+  const oggi=new Date(); oggi.setHours(0,0,0,0);
+  tbody.innerHTML=data.map(v=>{
+    const tipoHtml=v.tipo==='obbligatoria'
+      ?'<span class="badge badge-red">⚠️ Obbligatoria</span>'
+      :'<span class="badge badge-blue">✅ Facoltativa</span>';
+    let statoHtml='<span class="badge badge-green">✅ In regola</span>';
+    let richiamoHtml='—';
+    if(v.data_richiamo){
+      const richiamo=new Date(v.data_richiamo);
+      richiamoHtml=fmtDate(v.data_richiamo);
+      const diffDays=Math.ceil((richiamo-oggi)/(1000*60*60*24));
+      if(diffDays<0) statoHtml='<span class="badge badge-red">❌ Scaduto</span>';
+      else if(diffDays<=30) statoHtml=`<span class="badge badge-orange">⚠️ Tra ${diffDays} giorni</span>`;
+    }
+    return `<tr>
+      <td><strong>${v.nome}</strong></td>
+      <td>${tipoHtml}</td>
+      <td>${fmtDate(v.data_ultima)}</td>
+      <td>${richiamoHtml}</td>
+      <td>${v.veterinario||'—'}</td>
+      <td>${v.note||'—'}</td>
+      <td>${statoHtml}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="editVaccino('${v.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteVaccino('${v.id}','${v.nome}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  updateBadgeVaccini();
+}
+
+async function updateBadgeVaccini() {
+  const { data }=await sb.from('vaccinazioni').select('data_richiamo');
+  if(!data) return;
+  const oggi=new Date(); oggi.setHours(0,0,0,0);
+  const scaduti=(data||[]).filter(v=>{
+    if(!v.data_richiamo) return false;
+    const diffDays=Math.ceil((new Date(v.data_richiamo)-oggi)/(1000*60*60*24));
+    return diffDays<=30;
+  }).length;
+  const badge=document.getElementById('badge-vaccini');
+  if(scaduti>0){badge.style.display='';badge.textContent=scaduti;}else badge.style.display='none';
+}
+
+async function populateModalCaniSelectVac() {
+  const { data }=await sb.from('cani').select('id,nome').order('nome');
+  document.getElementById('vac-cane').innerHTML=(data||[]).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+}
+
+async function openModalVaccino() {
+  await populateModalCaniSelectVac();
+  document.getElementById('vac-id').value='';
+  ['vac-nome','vac-ultima','vac-richiamo','vac-vet','vac-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('vac-tipo').value='obbligatoria';
+  const cid=document.getElementById('filter-cane-vac')?.value;
+  if(cid) document.getElementById('vac-cane').value=cid;
+  document.getElementById('modal-vac-title').textContent='Aggiungi vaccinazione';
+  document.getElementById('modal-vaccino').classList.add('open');
+}
+
+async function editVaccino(id) {
+  const { data:v }=await sb.from('vaccinazioni').select('*').eq('id',id).single(); if(!v) return;
+  await populateModalCaniSelectVac();
+  document.getElementById('vac-id').value=v.id;
+  document.getElementById('vac-cane').value=v.cane_id;
+  document.getElementById('vac-nome').value=v.nome;
+  document.getElementById('vac-tipo').value=v.tipo||'obbligatoria';
+  document.getElementById('vac-ultima').value=v.data_ultima||'';
+  document.getElementById('vac-richiamo').value=v.data_richiamo||'';
+  document.getElementById('vac-vet').value=v.veterinario||'';
+  document.getElementById('vac-note').value=v.note||'';
+  document.getElementById('modal-vac-title').textContent='Modifica vaccinazione';
+  document.getElementById('modal-vaccino').classList.add('open');
+}
+
+async function salvaVaccino() {
+  const nome=document.getElementById('vac-nome').value.trim();
+  if(!nome){alert('Inserisci il nome del vaccino.');return;}
+  const id=document.getElementById('vac-id').value;
+  const payload={
+    cane_id:document.getElementById('vac-cane').value,
+    nome, tipo:document.getElementById('vac-tipo').value,
+    data_ultima:document.getElementById('vac-ultima').value||null,
+    data_richiamo:document.getElementById('vac-richiamo').value||null,
+    veterinario:document.getElementById('vac-vet').value.trim()||null,
+    note:document.getElementById('vac-note').value.trim()||null,
+  };
+  if(id) await sb.from('vaccinazioni').update(payload).eq('id',id);
+  else   await sb.from('vaccinazioni').insert(payload);
+  closeModal('modal-vaccino');
+  loadVaccinazioni(); updateBadgeVaccini();
+  showToast('✅ Vaccinazione salvata!');
+}
+
+async function deleteVaccino(id,nome) {
+  if(!confirm(`Eliminare '${nome}'?`)) return;
+  await sb.from('vaccinazioni').delete().eq('id',id);
+  loadVaccinazioni(); updateBadgeVaccini();
+  showToast('🗑 Vaccinazione eliminata');
+}
+
+// ── MODAL UTILS ───────────────────────────────
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',e=>{if(e.target===m) m.classList.remove('open');});
+});
+
+// ── INIT ──────────────────────────────────────
+loadDashboard();
+updateBadgeOggi();
+updateBadgeVaccini();
+checkNotificheAlAvvio();
+</script>
+</body>
+</html>
